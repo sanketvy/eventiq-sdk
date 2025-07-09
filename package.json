@@ -1,6 +1,6 @@
 {
   "name": "eventiq-sdk",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "JavaScript SDK for eventiq platform analytics",
   "main": "index.js",
   "scripts": {
