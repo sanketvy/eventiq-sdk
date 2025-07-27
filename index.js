@@ -48,6 +48,7 @@ export class EventIQ {
             this.URL = url;
         }
 
+        localStorage.setItem(Constants.SESSION_ID, crypto.randomUUID());
         // Store the project ID for use in all event tracking
         this.projectId = projectId;
     }
@@ -67,11 +68,13 @@ export class EventIQ {
     click(type, metaData = {}) {
         // Add the button type to metadata for easier filtering
         metaData.button = type;
+        console.log(sessionStorage.getItem(Constants.SESSION_ID))
 
         // Process the click event
         this._processEvent({
             type: Constants.CLICK,
             projectId: this.projectId,
+            sessionId: localStorage.getItem(Constants.SESSION_ID),
             metaData: metaData
         });
 
@@ -105,7 +108,7 @@ export class EventIQ {
     }
 
     /**
-     * Track special business events or conversions
+     * Track special business events or conversions considered as milestones
      *
      * This method should be used for significant user actions such as purchases,
      * subscriptions, account creations, or other conversion events that are
@@ -120,11 +123,11 @@ export class EventIQ {
      *   product_id: 'laptop-123'
      * });
      */
-    event(metaData = {}) {
+    milestone(metaData = {}) {
         // Only process if metadata is provided and not null
         if (metaData !== null) {
             this._processEvent({
-                type: Constants.EVENT,
+                type: Constants.MILESTONE,
                 projectId: this.projectId,
                 ...metaData
             });
@@ -250,15 +253,14 @@ export class EventIQ {
      */
     sessionStart(metaData = {}) {
         // Only process if metadata is provided and not null
+        metaData.sessionStart = "started"
         if (metaData !== null) {
             this._processEvent({
                 type: Constants.SESSION_START,
                 projectId: this.projectId,
-                ...metaData
+                sessionId: localStorage.getItem("sessionId"),
+                metaData: metaData
             });
-
-            // Debug logging (should be removed in production)
-            console.log(metaData);
         }
     }
 
@@ -275,16 +277,41 @@ export class EventIQ {
      * });
      */
     sessionEnd(metaData = {}) {
-        // Only process if metadata is provided and not null
         if (metaData !== null) {
-            this._processEvent({
-                type: Constants.SESSION_END,
-                projectId: this.projectId,
-                ...metaData
-            });
+            try {
+                const event = {
+                    type: Constants.SESSION_END,
+                    projectId: this.projectId,
+                    sessionId: localStorage.getItem("sessionId"),
+                    metaData: metaData
+                };
 
-            // Debug logging (should be removed in production)
-            console.log(metaData);
+                const data = JSON.stringify(event);
+                const blob = new Blob([data], { type: 'application/json' });
+
+                navigator.sendBeacon(this.URL, blob);
+            } catch (e) {
+                console.error("sessionEnd beacon failed", e);
+            }
+        }
+    }
+
+
+    /**
+     * Internal method to send events to the EventIQ API using sendBeacon.
+     * Used for critical unload-safe events like sessionEnd.
+     *
+     * @private
+     * @param {Object} event - The event object to send
+     */
+    _sendBeacon(event) {
+        try {
+            const data = JSON.stringify(event);
+            const blob = new Blob([data], { type: 'application/json' });
+
+            navigator.sendBeacon(this.URL, blob);
+        } catch (e) {
+            console.error("Beacon failed", e);
         }
     }
 
